@@ -375,6 +375,7 @@ namespace fastJSON
                 return CreateDataTable(o as Dictionary<string, object>, null);
 #endif
             if (o is IDictionary)
+            {
                 if (type != null && t == typeof(Dictionary<,>)) // deserialize a dictionary
                     return RootDictionary(o, type);
                 else // deserialize an object
