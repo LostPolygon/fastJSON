@@ -49,6 +49,7 @@
     <Compile Include="JsonParser.cs" />
     <Compile Include="Reflection.cs" />
     <Compile Include="SafeDictionary.cs" />
+    <Compile Include="IJSONSerializationCallbackReceiver.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Novell\Novell.MonoDroid.CSharp.targets" />
 </Project>

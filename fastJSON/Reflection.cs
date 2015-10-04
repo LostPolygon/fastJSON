@@ -4,7 +4,7 @@ using System.Text;
 using System.Reflection.Emit;
 using System.Reflection;
 using System.Collections;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 using System.Data;
 #endif
 using System.Collections.Specialized;
@@ -92,7 +92,7 @@ namespace fastJSON
         // JSON custom
         internal SafeDictionary<Type, Serialize> _customSerializer = new SafeDictionary<Type, Serialize>();
         internal SafeDictionary<Type, Deserialize> _customDeserializer = new SafeDictionary<Type, Deserialize>();
-        internal object CreateCustom(string v, Type type)
+        internal object CreateCustom(object v, Type type)
         {
             Deserialize d;
             _customDeserializer.TryGetValue(type, out d);
@@ -139,7 +139,17 @@ namespace fastJSON
                 return tt;
             else
             {
-                tt = t.GetGenericArguments();
+                Type baseType = t;
+                while (true) {
+                    tt = baseType.GetGenericArguments();
+                    if (tt.Length != 0)
+                        break;
+
+                    baseType = baseType.BaseType;
+                    if (baseType == null)
+                        break;
+                }
+                
                 _genericTypes.Add(t, tt);
                 return tt;
             }
@@ -162,7 +172,9 @@ namespace fastJSON
                     {// Property is an indexer
                         continue;
                     }
-                    myPropInfo d = CreateMyProp(p.PropertyType, p.Name, customType);
+
+                    bool isPropCustomType = Reflection.Instance.IsTypeRegistered(p.PropertyType);
+                    myPropInfo d = CreateMyProp(p.PropertyType, p.Name, isPropCustomType);
                     d.setter = Reflection.CreateSetMethod(type, p);
                     if (d.setter != null)
                         d.CanWrite = true;
@@ -210,7 +222,7 @@ namespace fastJSON
                 else
                     d_type = myPropInfoType.Array;
             }
-            else if (t.Name.Contains("Dictionary"))
+            else if (typeof(IDictionary).IsAssignableFrom(t))
             {
                 d.GenericTypes = Reflection.Instance.GetGenericArguments(t);// t.GetGenericArguments();
                 if (d.GenericTypes.Length > 0 && d.GenericTypes[0] == typeof(string))
@@ -218,7 +230,7 @@ namespace fastJSON
                 else
                     d_type = myPropInfoType.Dictionary;
             }
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             else if (t == typeof(Hashtable)) d_type = myPropInfoType.Hashtable;
             else if (t == typeof(DataSet)) d_type = myPropInfoType.DataSet;
             else if (t == typeof(DataTable)) d_type = myPropInfoType.DataTable;

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 using System.Data;
 #endif
 using System.Globalization;
@@ -57,6 +57,9 @@ namespace fastJSON
 
         private void WriteValue(object obj)
         {
+            if (obj is IJSONSerializationCallbackReceiver)
+                ((IJSONSerializationCallbackReceiver) obj).OnBeforeSerialize();
+
             if (obj == null || obj is DBNull)
                 _output.Append("null");
 
@@ -91,7 +94,7 @@ namespace fastJSON
 #endif
             else if (obj is IDictionary)
                 WriteDictionary((IDictionary)obj);
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             else if (obj is DataSet)
                 WriteDataset((DataSet)obj);
 
@@ -174,7 +177,19 @@ namespace fastJSON
         {
             Serialize s;
             Reflection.Instance._customSerializer.TryGetValue(obj.GetType(), out s);
-            WriteStringFast(s(obj));
+
+            object serializedObject = s(obj);
+            if (serializedObject == null)
+            {
+                WriteValue(null);
+            }
+            else if (serializedObject is IDictionary)
+            {
+                WriteStringDictionary((IDictionary) serializedObject);
+            } else
+            {
+                WriteStringFast((string) serializedObject);
+            }
         }
 
         private void WriteEnum(Enum e)
@@ -233,7 +248,7 @@ namespace fastJSON
             _output.Append('\"');
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         private DatasetSchema GetSchema(DataTable ds)
         {
             if (ds == null) return null;

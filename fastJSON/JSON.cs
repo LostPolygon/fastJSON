@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
 using System.Data;
 #endif
 using System.Globalization;
@@ -12,8 +12,8 @@ using System.Collections.Specialized;
 
 namespace fastJSON
 {
-    public delegate string Serialize(object data);
-    public delegate object Deserialize(string data);
+    public delegate object Serialize(object data);
+    public delegate object Deserialize(object data);
 
     public sealed class JSONParameters
     {
@@ -345,8 +345,17 @@ namespace fastJSON
             return ToObject(json, null);
         }
 
-        public object ToObject(string json, Type type)
+        public object ToObject(string json, Type type) 
         {
+            object decodedObject = DecodeJSONToObject(json, type);
+
+            if (decodedObject is IJSONSerializationCallbackReceiver)
+                ((IJSONSerializationCallbackReceiver) decodedObject).OnAfterDeserialize();
+
+            return decodedObject;
+        }
+
+        private object DecodeJSONToObject(string json, Type type) {
             //_params = Parameters;
             _params.FixValues();
             Type t = null;
@@ -359,14 +368,13 @@ namespace fastJSON
             object o = new JsonParser(json).Decode();
             if (o == null)
                 return null;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
             if (type != null && type == typeof(DataSet))
                 return CreateDataset(o as Dictionary<string, object>, null);
             else if (type != null && type == typeof(DataTable))
                 return CreateDataTable(o as Dictionary<string, object>, null);
 #endif
             if (o is IDictionary)
-            {
                 if (type != null && t == typeof(Dictionary<,>)) // deserialize a dictionary
                     return RootDictionary(o, type);
                 else // deserialize an object
@@ -428,7 +436,7 @@ namespace fastJSON
                 return CreateDateTime((string)value);
 
             else if (Reflection.Instance.IsTypeRegistered(conversionType))
-                return Reflection.Instance.CreateCustom((string)value, conversionType);
+                return Reflection.Instance.CreateCustom(value, conversionType);
 
             // 8-30-2014 - James Brooks - Added code for nullable types.
             if (IsNullable(conversionType))
@@ -620,7 +628,7 @@ namespace fastJSON
                                 // what about 'else'?
                                 break;
                             case myPropInfoType.ByteArray: oset = Convert.FromBase64String((string)v); break;
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
                             case myPropInfoType.DataSet: oset = CreateDataset((Dictionary<string, object>)v, globaltypes); break;
                             case myPropInfoType.DataTable: oset = CreateDataTable((Dictionary<string, object>)v, globaltypes); break;
                             case myPropInfoType.Hashtable: // same case as Dictionary
@@ -629,7 +637,7 @@ namespace fastJSON
                             case myPropInfoType.StringKeyDictionary: oset = CreateStringKeyDictionary((Dictionary<string, object>)v, pi.pt, pi.GenericTypes, globaltypes); break;
                             case myPropInfoType.NameValue: oset = CreateNV((Dictionary<string, object>)v); break;
                             case myPropInfoType.StringDictionary: oset = CreateSD((Dictionary<string, object>)v); break;
-                            case myPropInfoType.Custom: oset = Reflection.Instance.CreateCustom((string)v, pi.pt); break;
+                            case myPropInfoType.Custom: oset = Reflection.Instance.CreateCustom(v, pi.pt); break;
                             default:
                                 {
                                     if (pi.IsGenericType && pi.IsValueType == false && v is List<object>)
@@ -861,12 +869,18 @@ namespace fastJSON
                 object key = values["k"];
                 object val = values["v"];
 
-                if (key is Dictionary<string, object>)
+                bool isKeyCustomType = Reflection.Instance.IsTypeRegistered(t1);
+                bool isValueCustomType = Reflection.Instance.IsTypeRegistered(t2);
+
+                if (!isKeyCustomType && key is Dictionary<string, object>)
                     key = ParseDictionary((Dictionary<string, object>)key, globalTypes, t1, null);
                 else
                     key = ChangeType(key, t1);
 
-                if (val is Dictionary<string, object>)
+                if (ReferenceEquals(null, key) || key.Equals(null))
+                    continue;
+
+                if (!isValueCustomType && val is Dictionary<string, object>)
                     val = ParseDictionary((Dictionary<string, object>)val, globalTypes, t2, null);
                 else
                     val = ChangeType(val, t2);
@@ -877,7 +891,7 @@ namespace fastJSON
             return col;
         }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !UNITY
         private DataSet CreateDataset(Dictionary<string, object> reader, Dictionary<string, object> globalTypes)
         {
             DataSet ds = new DataSet();
