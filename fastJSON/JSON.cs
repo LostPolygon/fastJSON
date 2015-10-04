@@ -387,6 +387,8 @@ namespace fastJSON
                     return RootDictionary(o, type);
                 else if (type != null && t == typeof(List<>)) // deserialize to generic list
                     return RootList(o, type);
+                else if (type != null && type.IsArray) // deserialize to generic list
+                    return RootArray((IList) o, type);
                 else if (type == typeof(Hashtable))
                     return RootHashTable((List<object>)o);
                 else
@@ -466,6 +468,28 @@ namespace fastJSON
         private Type UnderlyingTypeOf(Type t)
         {
             return t.GetGenericArguments()[0];
+        }
+
+        private object RootArray(IList parse, Type type)
+        {
+            Type elementType = type.GetElementType();
+            int parseCount = parse.Count;
+            Array o = Array.CreateInstance(elementType, parseCount);
+
+            for (int i = 0; i < parseCount; i++)
+            {
+                object k = parse[i];
+                _usingglobals = false;
+                object v = k;
+                if (k is Dictionary<string, object>)
+                    v = ParseDictionary(k as Dictionary<string, object>, null, elementType, null);
+                else
+                    v = ChangeType(k, elementType);
+
+                o.SetValue(v, i);
+            }
+
+            return o;
         }
 
         private object RootList(object parse, Type type)
